@@ -64,7 +64,7 @@ app.add_middleware(
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # فولدر الفرونت
-frontend_dir = BASE_DIR / "frontend"
+frontend_dir = Path(r"D:\\projects\\FastApi\\forntend")
 
 # ملفات CSS / JS / Images
 app.mount("/static", StaticFiles(directory=frontend_dir), name="static")

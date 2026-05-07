@@ -1,11 +1,16 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-import os
 
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
+from app.core.config import get_settings
 
-client = AsyncIOMotorClient(MONGO_URL)
-db = client.deepfake_db
+settings = get_settings()
+
+client = AsyncIOMotorClient(settings.mongo_uri)
+db = client[settings.mongo_db_name]
 
 
-def get_db():
+async def get_db():
+    return db
+
+
+async def get_database():
     return db

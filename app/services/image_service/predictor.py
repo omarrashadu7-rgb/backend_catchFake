@@ -1,13 +1,14 @@
 import httpx
-import os
 import time
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
-HF_TOKEN="[ENCRYPTION_KEY]"
-MODEL_URL="https://api-inference.huggingface.co/models/Ahmedkhairy2/Deepfake_last2"
+HF_TOKEN = settings.hf_token
+MODEL_URL = settings.hf_model_url.strip()
+if "huggingface.co/models/" in MODEL_URL and "api-inference.huggingface.co" not in MODEL_URL:
+    MODEL_URL = MODEL_URL.replace("https://huggingface.co", "https://api-inference.huggingface.co")
 
 HEADERS = {
     "Authorization": f"Bearer {HF_TOKEN}"

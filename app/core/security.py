@@ -23,7 +23,7 @@ from app.services.auth_service import AuthService, get_auth_service, decode_acce
 _bearer_scheme = HTTPBearer(auto_error=True)
 
 
-def get_current_user(
+async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
     service: AuthService = Depends(get_auth_service),
 ) -> UserInDB:
@@ -39,7 +39,7 @@ def get_current_user(
     """
     user_id = decode_access_token(credentials.credentials)
 
-    user = service.get_user_by_id(user_id)
+    user = await service.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

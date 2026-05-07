@@ -4,9 +4,6 @@ import shutil
 import uuid
 
 from app.services.image_service.predictor import predict_image
-from app.services.upload_service import get_upload_service
-
-upload_service = get_upload_service()
 
 router = APIRouter(prefix="/images", tags=["Images"])
 

@@ -17,8 +17,8 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
         "Returns a JWT access token on success."
     ),
 )
-def signup(payload: UserCreate, service: AuthService = Depends(get_auth_service)):
-    token_data = service.signup(payload)
+async def signup(payload: UserCreate, service: AuthService = Depends(get_auth_service)):
+    token_data = await service.signup(payload)
     return success_response(
         data=token_data.model_dump(),
         message="Account created successfully.",
@@ -35,8 +35,8 @@ def signup(payload: UserCreate, service: AuthService = Depends(get_auth_service)
         "Returns a signed JWT access token valid for the configured TTL."
     ),
 )
-def login(payload: UserLogin, service: AuthService = Depends(get_auth_service)):
-    token_data = service.login(payload)
+async def login(payload: UserLogin, service: AuthService = Depends(get_auth_service)):
+    token_data = await service.login(payload)
     return success_response(
         data=token_data.model_dump(),
         message="Login successful.",

@@ -6,7 +6,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pymongo.database import Database
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.user import UserCreate, UserLogin, UserInDB, UserResponse, TokenResponse
 from app.core.config import get_settings
@@ -73,27 +73,27 @@ def _serialize_user(doc: dict) -> dict:
     return doc
 
 
-def _get_user_by_email(db: Database, email: str) -> Optional[dict]:
-    return db["users"].find_one({"email": email.lower()})
+async def _get_user_by_email(db: AsyncIOMotorDatabase, email: str) -> Optional[dict]:
+    return await db["users"].find_one({"email": email.lower()})
 
 
-def _get_user_by_id(db: Database, user_id: str) -> Optional[dict]:
+async def _get_user_by_id(db: AsyncIOMotorDatabase, user_id: str) -> Optional[dict]:
     try:
         oid = ObjectId(user_id)
     except InvalidId:
         return None
-    return db["users"].find_one({"_id": oid})
+    return await db["users"].find_one({"_id": oid})
 
 
 # ── Auth Service ───────────────────────────────────────────────────────────────
 
 class AuthService:
-    def __init__(self, db: Database):
+    def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
         self.users = db["users"]
 
     # ── Signup ─────────────────────────────────────────────────────────────────
-    def signup(self, payload: UserCreate) -> TokenResponse:
+    async def signup(self, payload: UserCreate) -> TokenResponse:
         """
         Register a new user.
 
@@ -102,7 +102,7 @@ class AuthService:
         """
         email = payload.email.lower()
 
-        if self.users.find_one({"email": email}):
+        if await self.users.find_one({"email": email}):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Email '{email}' is already registered.",
@@ -116,7 +116,7 @@ class AuthService:
             "created_at": now,
         }
 
-        result = self.users.insert_one(doc)
+        result = await self.users.insert_one(doc)
         doc["_id"] = result.inserted_id
 
         serialized = _serialize_user(doc)
@@ -130,7 +130,7 @@ class AuthService:
         return TokenResponse(access_token=token, user=user_resp)
 
     # ── Login ──────────────────────────────────────────────────────────────────
-    def login(self, payload: UserLogin) -> TokenResponse:
+    async def login(self, payload: UserLogin) -> TokenResponse:
         """
         Authenticate a user by email/password.
 
@@ -138,7 +138,7 @@ class AuthService:
             401 if credentials are invalid (intentionally vague for security).
         """
         email = payload.email.lower()
-        doc = self.users.find_one({"email": email})
+        doc = await self.users.find_one({"email": email})
 
         if not doc or not verify_password(payload.password, doc["hashed_password"]):
             raise HTTPException(
@@ -158,15 +158,15 @@ class AuthService:
         return TokenResponse(access_token=token, user=user_resp)
 
     # ── Fetch current user ─────────────────────────────────────────────────────
-    def get_user_by_id(self, user_id: str) -> Optional[UserInDB]:
-        doc = _get_user_by_id(self.db, user_id)
+    async def get_user_by_id(self, user_id: str) -> Optional[UserInDB]:
+        doc = await _get_user_by_id(self.db, user_id)
         if not doc:
             return None
         s = _serialize_user(doc)
         return UserInDB(**s)
 
 
-def get_auth_service() -> AuthService:
+async def get_auth_service() -> AuthService:
     """FastAPI dependency that provides a ready-to-use AuthService."""
     from app.database.mongodb import get_database
-    return AuthService(get_database())
+    return AuthService(await get_database())

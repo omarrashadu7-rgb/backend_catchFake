@@ -35,11 +35,11 @@ async def upload_file(
     summary="Get user upload history",
     description="Retrieve all uploads and their processing results for the authenticated user."
 )
-def get_user_history(
+async def get_user_history(
     current_user: UserInDB = Depends(get_current_user),
     service: UploadService = Depends(get_upload_service)
 ):
-    uploads = service.get_uploads_by_user(current_user.id)
+    uploads = await service.get_uploads_by_user(current_user.id)
     return success_response(
         data=[u.model_dump() for u in uploads],
         message="History retrieved successfully."
@@ -52,14 +52,14 @@ def get_user_history(
     summary="Get upload by ID",
     description="Retrieve specific upload details and AI results. Returns 404 if not found or unauthorized."
 )
-def get_upload_result(
+async def get_upload_result(
     upload_id: str,
     current_user: UserInDB = Depends(get_current_user),
     service: UploadService = Depends(get_upload_service)
 ):
     from fastapi import HTTPException
-    
-    upload = service.get_upload_by_id(current_user.id, upload_id)
+
+    upload = await service.get_upload_by_id(current_user.id, upload_id)
     if not upload:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -76,12 +76,12 @@ def get_upload_result(
     summary="Download AI report PDF",
     description="Retrieve the generated PDF report for an upload. Must be authorized as the owner."
 )
-def download_report(
+async def download_report(
     upload_id: str,
     current_user: UserInDB = Depends(get_current_user),
     service: UploadService = Depends(get_upload_service)
 ):
-    upload = service.get_upload_by_id(current_user.id, upload_id)
+    upload = await service.get_upload_by_id(current_user.id, upload_id)
     if not upload:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
