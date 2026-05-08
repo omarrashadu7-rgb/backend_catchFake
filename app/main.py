@@ -5,8 +5,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-
-from fastapi.responses import FileResponse
 from pathlib import Path
 from app.routers.auth_router import router as auth_router
 from app.routers.image_router import router as image_router
@@ -62,17 +60,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# فولدر الفرونت
-frontend_dir = Path(r"D:\\projects\\FastApi\\forntend")
-
-# ملفات CSS / JS / Images
-app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
-
-# الصفحة الرئيسية
-@app.get("/")
-async def serve_frontend():
-    return FileResponse(frontend_dir / "index.html")
 
 @app.exception_handler(DomainException)
 async def domain_exception_handler(request: Request, exc: DomainException):
