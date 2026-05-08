@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     hf_token: str = "HF_TOKEN_2"
     hf_model_url: str = "https://api-inference.huggingface.co/models/mohamedahmed2003/deepfake-detector"
 
+    # HuggingFace Space (Gradio) API
+    hf_space_id: str = "Ahmedkhairy2/deepfake"
+    hf_space_api_name: str = "/analyze"
+
+    # HuggingFace Space (Gradio) API for video
+    hf_video_space_id: str = "mohamedahmed2003/deepfake-detector"
+    hf_video_space_api_name: str = "/gradio_fn"
+
     # Video processing
     # Number of evenly-spaced frames extracted per video for prediction
     video_sample_frames: int = 16
