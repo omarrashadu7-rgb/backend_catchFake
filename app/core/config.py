@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60  # 1 hour default
+    jwt_refresh_expire_minutes: int = 10080  # 7 days default
 
     # HuggingFace Inference API
     # Replace with your token in .env — never commit the real value

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends
 from pathlib import Path
 import shutil
 import uuid
 
 from app.services.image_service.predictor import predict_image
+from app.core.security import get_current_user
+from app.models.user import UserInDB
 
 router = APIRouter(prefix="/images", tags=["Images"])
 
@@ -12,7 +14,10 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")
-async def upload_and_predict(file: UploadFile = File(...)):
+async def upload_and_predict(
+    file: UploadFile = File(...),
+    current_user: UserInDB = Depends(get_current_user),
+):
 
     file_extension = file.filename.split(".")[-1]
     unique_filename = f"{uuid.uuid4()}.{file_extension}"
@@ -32,25 +37,3 @@ async def upload_and_predict(file: UploadFile = File(...)):
             "prediction": result
         }
     }
-        # Call predictor
-    prediction_result = await predict_image(str(file_path))
-
-    # Create upload record
-    upload_record = {
-        "file_name": unique_filename,
-        "file_path": str(file_path),
-        "prediction": prediction_result,   # ← store result here
-        "error_message": None
-    }
-
-    # Save to DB
-    await upload_service.save(upload_record)
-
-    return {
-        "success": True,
-        "message": "Processed & saved to MongoDB",
-        "data": {
-            "file": unique_filename,
-            "prediction": prediction_result
-        }
-    }                                                                           

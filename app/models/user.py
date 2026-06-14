@@ -25,6 +25,7 @@ class UserResponse(BaseModel):
     id: str = Field(..., description="User MongoDB ObjectId as string")
     name: str
     email: EmailStr
+    role: str = Field("user", description="User role")
     created_at: datetime
 
     class Config:
@@ -34,8 +35,17 @@ class UserResponse(BaseModel):
 class TokenResponse(BaseModel):
     """JWT token payload returned after successful authentication."""
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
 
 
 # ── Internal DB Model ──────────────────────────────────────────────────────────
@@ -45,7 +55,9 @@ class UserInDB(BaseModel):
     id: str
     name: str
     email: str
+    role: str = "user"
     hashed_password: str
+    refresh_token_hash: Optional[str] = None
     created_at: datetime
 
     class Config:

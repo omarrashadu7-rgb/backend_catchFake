@@ -5,9 +5,13 @@ import time
 
 import httpx
 
+from app.core.logging_config import get_logger
+
 from app.core.config import get_settings
 
 settings = get_settings()
+
+logger = get_logger(__name__)
 
 HF_TOKEN = settings.hf_token
 SPACE_ID = settings.hf_space_id
@@ -92,9 +96,11 @@ async def predict_image(file_path: str) -> dict:
             if line.startswith("data:")
         ]
         if not data_lines:
+            logger.info("Gradio raw response (first 2000 chars): %s", result_resp.text[:2000])
             raise ValueError("No data in Gradio response")
 
         last_payload = json.loads(data_lines[-1])
+        logger.info("Gradio last payload: %s", last_payload)
         if isinstance(last_payload, dict):
             output = last_payload.get("output") or last_payload
             result_data = output.get("data") if isinstance(output, dict) else output
@@ -106,13 +112,20 @@ async def predict_image(file_path: str) -> dict:
 
         prediction = result_data[0]
         confidence = None
+        heatmap_url = None
+        if len(result_data) > 1:
+            heatmap_data = result_data[1]
+            if isinstance(heatmap_data, dict):
+                heatmap_url = heatmap_data.get("url") or heatmap_data.get("path")
+            else:
+                heatmap_url = heatmap_data
 
         return {
             "prediction": prediction,
             "confidence": confidence,
             "processing_time": round(time.time() - start_time, 2),
             "result_source": "huggingface_space",
-            "heatmap_url": result_data[1] if len(result_data) > 1 else None
+            "heatmap_url": heatmap_url
         }
 
     except Exception as e:
