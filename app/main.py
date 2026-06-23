@@ -24,10 +24,12 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting up DeepFake Detection API...")
 
-    for subdir in ["images", "videos", "heatmaps", "reports"]:
-        os.makedirs(os.path.join(settings.upload_dir, subdir), exist_ok=True)
+    try:
+        for subdir in ["images", "videos", "heatmaps", "reports"]:
+            os.makedirs(os.path.join(settings.upload_dir, subdir), exist_ok=True)
+    except Exception:
+        logger.warning("Could not create upload directories (read-only filesystem - expected on Vercel)")
 
-   
     logger.info(
         "AI inference is delegated to isolated image/video services; "
         "backend will not import TensorFlow."
