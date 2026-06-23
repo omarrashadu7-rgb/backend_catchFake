@@ -10,7 +10,10 @@ from app.models.user import UserInDB
 router = APIRouter(prefix="/images", tags=["Images"])
 
 UPLOAD_DIR = Path("uploads/images")
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    pass  # Read-only filesystem on Vercel — uploads handled in /tmp or skipped
 
 
 @router.post("/upload")
