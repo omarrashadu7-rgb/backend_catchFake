@@ -63,8 +63,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Serve uploaded files (videos, images, heatmaps) as static assets
 uploads_dir = os.path.join(os.getcwd(), settings.upload_dir)
-os.makedirs(uploads_dir, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+try:
+    os.makedirs(uploads_dir, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+except Exception:
+    logger.warning("Could not mount uploads directory (read-only filesystem - expected on Vercel)")
 
 @app.exception_handler(DomainException)
 async def domain_exception_handler(request: Request, exc: DomainException):
