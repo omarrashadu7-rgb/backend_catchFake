@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         "http://localhost:8080",
         "http://127.0.0.1:8080",
         "null",                    # file:// origin (open-from-disk)
-        "*",                       # Allow all (Vercel/production)
+        "https://catch-fake.vercel.app",   # Production frontend
     ]
 
     # Storage
