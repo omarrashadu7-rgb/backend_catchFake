@@ -17,7 +17,6 @@ services:
         value: "60"
       - key: VIDEO_SAMPLE_FRAMES
         value: "16"
-      # ⚠️ الـ secrets دي هتضيفها يدوياً في Render Dashboard
       # MONGO_URI
       # JWT_SECRET_KEY
       # HF_TOKEN
