@@ -11,6 +11,8 @@ from app.services.video_service.predictor import predict_video
 from app.core.config import get_settings
 from app.core.logging_config import get_logger
 from app.middleware.error_handler import ValidationError, FileProcessingError
+from app.middleware.activity_logger import log_activity
+from app.models.admin import ActivityAction
 from app.database.mongodb import get_db
 
 
@@ -163,6 +165,27 @@ class UploadService:
                 file_path,
             )
             logger.info(f"Video queued for background processing — doc_id={inserted.inserted_id}")
+
+        # ── Log the upload activity ────────────────────────────────────────────
+        log_action = (
+            ActivityAction.UPLOAD_IMAGE if file_type == UploadType.IMAGE
+            else ActivityAction.UPLOAD_VIDEO
+        )
+        await log_activity(
+            db=self.db,
+            user_id=user_id,
+            user_email="",   # resolved below if needed; kept lightweight here
+            user_name="",
+            action=log_action,
+            details={
+                "upload_id":        str(inserted.inserted_id),
+                "filename":         original_filename,
+                "file_type":        file_type.value,
+                "prediction":       doc.get("prediction"),
+                "confidence":       doc.get("confidence"),
+                "status":           doc.get("status"),
+            },
+        )
 
         return UploadResponse(**_serialize_upload(doc))
 
