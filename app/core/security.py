@@ -4,12 +4,16 @@ core/security.py
 FastAPI dependency for JWT-based request authentication.
 
 Usage in any protected endpoint:
-    from core.security import get_current_user
+    from core.security import get_current_user, get_current_admin
     from models.user import UserInDB
 
     @router.get("/me")
     def me(current_user: UserInDB = Depends(get_current_user)):
         return {"id": current_user.id, "email": current_user.email}
+
+    @router.get("/admin-only")
+    def admin_view(admin: UserInDB = Depends(get_current_admin)):
+        return {"admin": admin.email}
 """
 
 from fastapi import Depends, HTTPException, status
@@ -47,3 +51,24 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
+
+
+async def get_current_admin(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    """
+    Admin guard dependency.
+
+    Verifies the authenticated user has role == 'admin'.
+    Must be used AFTER get_current_user in the dependency chain.
+
+    Raises:
+        403  — authenticated user exists but is not an admin
+    """
+    from fastapi import HTTPException, status as http_status
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+    return current_user

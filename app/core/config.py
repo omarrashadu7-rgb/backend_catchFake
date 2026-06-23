@@ -45,12 +45,23 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
-    jwt_expire_minutes: int = 60  # 1 hour default
+    jwt_expire_minutes: int = 60       # 1 hour default
     jwt_refresh_expire_minutes: int = 10080  # 7 days default
+
+    # Admin
+    # Stored as a plain string to avoid pydantic-settings JSON-parsing issues
+    # with list[str] fields when the env var is empty or comma-separated.
+    # Use the `admin_emails` property to get a parsed Python list.
+    # In .env:  ADMIN_EMAILS=alice@example.com,bob@example.com
+    admin_emails_raw: str = ""
+
+    @property
+    def admin_emails(self) -> list[str]:
+        """Return the parsed list of admin emails (lowercased, stripped)."""
+        return [e.strip().lower() for e in self.admin_emails_raw.split(",") if e.strip()]
 
     # HuggingFace Inference API
     # Replace with your token in .env — never commit the real value
-    
     hf_token: str = "HF_TOKEN_2"
     hf_model_url: str = "https://api-inference.huggingface.co/models/mohamedahmed2003/deepfake-detector"
 
@@ -74,6 +85,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
 @lru_cache()

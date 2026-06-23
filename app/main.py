@@ -10,6 +10,7 @@ from app.routers.auth_router import router as auth_router
 from app.routers.image_router import router as image_router
 from app.routers.video_router import router as video_router
 from app.routers.report_router import router as report_router
+from app.routers.admin_router import router as admin_router
 from app.utils.temp_legacy.items_router import router as items_router
 from app.utils.temp_legacy.health import router as legacy_health_router
 from app.core.config import get_settings
@@ -99,6 +100,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(image_router, prefix="/api/v1")
 app.include_router(video_router, prefix="/api/v1")
 app.include_router(report_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 app.include_router(items_router, prefix="/api/v1")
 # Including legacy health router just in case, but new /health is defined above
 app.include_router(legacy_health_router, prefix="/api/v1")

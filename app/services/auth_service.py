@@ -10,6 +10,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.user import UserCreate, UserLogin, UserInDB, UserResponse, TokenResponse
 from app.core.config import get_settings
+from app.middleware.activity_logger import log_activity
+from app.models.admin import ActivityAction
 
 settings = get_settings()
 
@@ -148,11 +150,16 @@ class AuthService:
             )
 
         now = datetime.now(timezone.utc)
+
+        # Auto-grant admin role if email is in the ADMIN_EMAILS list
+        admin_emails = [e.strip().lower() for e in settings.admin_emails]
+        role = "admin" if email in admin_emails else "user"
+
         doc = {
             "name": payload.name.strip(),
             "email": email,
             "hashed_password": hash_password(payload.password),
-            "role": "user",
+            "role": role,
             "refresh_token_hash": None,
             "created_at": now,
         }
@@ -171,6 +178,17 @@ class AuthService:
         access_token = create_access_token(subject=user_resp.id)
         refresh_token = create_refresh_token(subject=user_resp.id)
         await self._set_refresh_token(user_resp.id, refresh_token)
+
+        # Log signup activity
+        await log_activity(
+            db=self.db,
+            user_id=user_resp.id,
+            user_email=user_resp.email,
+            user_name=user_resp.name,
+            action=ActivityAction.SIGNUP,
+            details={"role": user_resp.role},
+        )
+
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -206,6 +224,16 @@ class AuthService:
         access_token = create_access_token(subject=user_resp.id)
         refresh_token = create_refresh_token(subject=user_resp.id)
         await self._set_refresh_token(user_resp.id, refresh_token)
+
+        # Log login activity
+        await log_activity(
+            db=self.db,
+            user_id=user_resp.id,
+            user_email=user_resp.email,
+            user_name=user_resp.name,
+            action=ActivityAction.LOGIN,
+        )
+
         return TokenResponse(
             access_token=access_token,
             refresh_token=refresh_token,
