@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
@@ -27,6 +29,14 @@ class Settings(BaseSettings):
 
     # Storage
     upload_dir: str = "uploads"
+
+    @field_validator("upload_dir", mode="before")
+    @classmethod
+    def resolve_upload_dir(cls, v: str) -> str:
+        # Vercel has a read-only filesystem — only /tmp is writable
+        if os.environ.get("VERCEL"):
+            return "/tmp/uploads"
+        return v
 
     # MongoDB
     mongo_uri: str = "mongodb://localhost:27017"
