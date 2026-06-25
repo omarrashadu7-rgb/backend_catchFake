@@ -1,6 +1,7 @@
 import json
 import mimetypes
 import os
+import re
 import time
 
 import httpx
@@ -113,12 +114,35 @@ async def predict_image(file_path: str) -> dict:
         prediction = result_data[0]
         confidence = None
         heatmap_url = None
+
+        # ── Extract heatmap from second element ────────────────────────────────
         if len(result_data) > 1:
             heatmap_data = result_data[1]
             if isinstance(heatmap_data, dict):
                 heatmap_url = heatmap_data.get("url") or heatmap_data.get("path")
             else:
                 heatmap_url = heatmap_data
+
+        # ── Extract confidence from prediction string ──────────────────────────
+        # Model may return "Fake | Confidence: 83.24%" or "Real\nConfidence: 96.10%"
+        # Try dedicated field first, then parse from prediction text.
+        if len(result_data) > 2 and result_data[2] is not None:
+            raw_conf = result_data[2]
+            if isinstance(raw_conf, (int, float)):
+                confidence = f"{float(raw_conf):.2f}%"
+            elif isinstance(raw_conf, str):
+                m = re.search(r"(\d+(?:\.\d+)?)\s*%", raw_conf)
+                confidence = f"{float(m.group(1)):.2f}%" if m else raw_conf
+
+        if confidence is None and isinstance(prediction, str):
+            m = re.search(r"(\d+(?:\.\d+)?)\s*%", prediction)
+            if m:
+                confidence = f"{float(m.group(1)):.2f}%"
+
+        logger.info(
+            "[predict_image] prediction=%s, confidence=%s, heatmap_url=%s",
+            prediction, confidence, heatmap_url
+        )
 
         return {
             "prediction": prediction,
