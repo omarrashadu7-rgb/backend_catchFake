@@ -52,6 +52,7 @@ def _apply_prediction_result(doc: dict, result: dict, source: str) -> None:
     doc["status"] = UploadStatus.DONE
     doc["prediction"] = result.get("prediction")
     doc["confidence"] = result.get("confidence")
+    doc["fake_probability"] = result.get("fake_probability")
     doc["processing_time"] = result.get("processing_time")
     doc["result_source"] = result.get("result_source", source)
     doc["heatmap_url"] = result.get("heatmap_url")
@@ -209,6 +210,7 @@ class UploadService:
                     "status": UploadStatus.DONE,
                     "prediction": result.get("prediction"),
                     "confidence": result.get("confidence"),
+                    "fake_probability": result.get("fake_probability"),
                     "processing_time": result.get("processing_time"),
                     "result_source": result.get("result_source", "video_service"),
                     "heatmap_url": result.get("heatmap_url"),
