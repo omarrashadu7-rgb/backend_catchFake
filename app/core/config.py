@@ -71,7 +71,7 @@ class Settings(BaseSettings):
 
     # HuggingFace Space (Gradio) API for video
     hf_video_space_id: str = "mohamedahmed2003/deepfake-detector"
-    hf_video_space_api_name: str = "/gradio_fn"
+    hf_video_space_api_name: str = "/analyze"
 
     # Video processing
     # Number of evenly-spaced frames extracted per video for prediction
