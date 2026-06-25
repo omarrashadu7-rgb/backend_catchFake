@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 HF_TOKEN = settings.hf_token
 SPACE_ID = settings.hf_video_space_id
 SPACE_API_NAME = settings.hf_video_space_api_name.lstrip("/")
-SPACE_ROOT = f"https://{SPACE_ID.replace('/', '-')}.hf.space"
+SPACE_ROOT = f"https://{SPACE_ID.replace('/', '-').lower()}.hf.space"
 
 
 class AIServiceUnavailable(Exception):

@@ -16,12 +16,17 @@ logger = get_logger(__name__)
 
 HF_TOKEN = settings.hf_token
 SPACE_ID = settings.hf_space_id
-SPACE_API_NAME = settings.hf_space_api_name.lstrip("/")
-SPACE_ROOT = f"https://{SPACE_ID.replace('/', '-')}.hf.space"
+SPACE_ROOT = f"https://{SPACE_ID.replace('/', '-').lower()}.hf.space"
 
-HEADERS = {
-    "Authorization": f"Bearer {HF_TOKEN}"
-}
+# Strip leading slash and ensure it's a simple endpoint name (not a full space path).
+# On Vercel the env var may accidentally be set to the video space id instead of "/analyze".
+_raw_api_name = settings.hf_space_api_name.lstrip("/").strip()
+SPACE_API_NAME = _raw_api_name if "/" not in _raw_api_name else "analyze"
+
+logger.info(
+    "[image predictor] SPACE_ROOT=%s, SPACE_API_NAME=%s",
+    SPACE_ROOT, SPACE_API_NAME
+)
 
 
 class AIServiceUnavailable(Exception):
@@ -32,9 +37,6 @@ async def predict_image(file_path: str) -> dict:
     start_time = time.time()
 
     try:
-        with open(file_path, "rb") as f:
-            image_bytes = f.read()
-
         headers = {}
         if HF_TOKEN:
             headers["Authorization"] = f"Bearer {HF_TOKEN}"
@@ -43,6 +45,7 @@ async def predict_image(file_path: str) -> dict:
         mime_type = mime_type or "application/octet-stream"
 
         async with httpx.AsyncClient(timeout=300) as client:
+            # ── Step 1: Upload file (open once only) ─────────────────────────
             with open(file_path, "rb") as f:
                 files = {
                     "files": (os.path.basename(file_path), f, mime_type)
@@ -56,9 +59,12 @@ async def predict_image(file_path: str) -> dict:
 
             upload_data = upload_resp.json()
             if not isinstance(upload_data, list) or not upload_data:
-                raise ValueError("Unexpected upload response")
+                raise ValueError(f"Unexpected upload response: {upload_resp.text[:200]}")
 
             uploaded_path = upload_data[0]
+            logger.info("[predict_image] Uploaded to HF Space: %s", uploaded_path)
+
+            # ── Step 2: Call /analyze endpoint ────────────────────────────────
             payload = {
                 "data": [
                     {
@@ -83,37 +89,69 @@ async def predict_image(file_path: str) -> dict:
                 event_id = call_resp.text.strip().strip("\"")
 
             if not event_id:
-                raise ValueError("Missing event_id from Gradio queue")
+                raise ValueError(f"Missing event_id from Gradio queue. Response: {call_resp.text[:200]}")
 
+            logger.info("[predict_image] event_id=%s, polling result...", event_id)
+
+            # ── Step 3: Poll result (SSE stream) ──────────────────────────────
             result_resp = await client.get(
                 f"{SPACE_ROOT}/gradio_api/call/{SPACE_API_NAME}/{event_id}",
                 headers=headers,
             )
             result_resp.raise_for_status()
 
-        data_lines = [
-            line[5:].strip()
-            for line in result_resp.text.splitlines()
-            if line.startswith("data:")
-        ]
-        if not data_lines:
-            logger.info("Gradio raw response (first 2000 chars): %s", result_resp.text[:2000])
-            raise ValueError("No data in Gradio response")
+        # ── Step 4: Parse SSE stream (event: complete / event: error) ────────
+        lines = result_resp.text.splitlines()
+        current_event = None
+        result_data = None
 
-        last_payload = json.loads(data_lines[-1])
-        logger.info("Gradio last payload: %s", last_payload)
-        if isinstance(last_payload, dict):
-            output = last_payload.get("output") or last_payload
-            result_data = output.get("data") if isinstance(output, dict) else output
-        else:
-            result_data = last_payload
+        for line in lines:
+            if line.startswith("event:"):
+                current_event = line[6:].strip()
+            elif line.startswith("data:"):
+                raw = line[5:].strip()
+                if current_event == "error":
+                    try:
+                        err = json.loads(raw)
+                        err_msg = err.get("error") or "HuggingFace Space returned an error"
+                    except Exception:
+                        err_msg = raw or "HuggingFace Space returned an error"
+                    raise AIServiceUnavailable(f"Model error: {err_msg}")
+
+                if current_event == "complete":
+                    try:
+                        payload_parsed = json.loads(raw)
+                    except json.JSONDecodeError as e:
+                        raise ValueError(f"Could not parse Gradio complete payload: {e}")
+
+                    if isinstance(payload_parsed, list):
+                        result_data = payload_parsed
+                    elif isinstance(payload_parsed, dict):
+                        output = payload_parsed.get("output") or payload_parsed
+                        result_data = output.get("data") if isinstance(output, dict) else output
+
+        if result_data is None:
+            logger.info("Gradio raw response (first 2000 chars): %s", result_resp.text[:2000])
+            raise ValueError("No 'complete' event found in Gradio response")
 
         if not isinstance(result_data, (list, tuple)) or len(result_data) < 1:
-            raise ValueError("Unexpected model response format")
+            raise ValueError(f"Unexpected model response format: {result_data}")
 
         prediction = result_data[0]
+        raw_prediction_text = prediction if isinstance(prediction, str) else ""
         confidence = None
         heatmap_url = None
+
+        # ── Normalise prediction label ─────────────────────────────────────────
+        # The model may return: "Prediction: Fake\nConfidence: 51.84%", "FAKE", etc.
+        # Extract a clean "Fake" / "Real" label for consistent storage.
+        if isinstance(prediction, str):
+            pred_lower = prediction.lower()
+            if "fake" in pred_lower:
+                prediction = "Fake"
+            elif "real" in pred_lower:
+                prediction = "Real"
+            # else keep as-is (unknown)
 
         # ── Extract heatmap from second element ────────────────────────────────
         if len(result_data) > 1:
@@ -123,9 +161,8 @@ async def predict_image(file_path: str) -> dict:
             else:
                 heatmap_url = heatmap_data
 
-        # ── Extract confidence from prediction string ──────────────────────────
-        # Model may return "Fake | Confidence: 83.24%" or "Real\nConfidence: 96.10%"
-        # Try dedicated field first, then parse from prediction text.
+        # ── Extract confidence ─────────────────────────────────────────────────
+        # Try result_data[2] first, then parse from the raw prediction text.
         if len(result_data) > 2 and result_data[2] is not None:
             raw_conf = result_data[2]
             if isinstance(raw_conf, (int, float)):
@@ -134,8 +171,8 @@ async def predict_image(file_path: str) -> dict:
                 m = re.search(r"(\d+(?:\.\d+)?)\s*%", raw_conf)
                 confidence = f"{float(m.group(1)):.2f}%" if m else raw_conf
 
-        if confidence is None and isinstance(prediction, str):
-            m = re.search(r"(\d+(?:\.\d+)?)\s*%", prediction)
+        if confidence is None and raw_prediction_text:
+            m = re.search(r"(\d+(?:\.\d+)?)\s*%", raw_prediction_text)
             if m:
                 confidence = f"{float(m.group(1)):.2f}%"
 
